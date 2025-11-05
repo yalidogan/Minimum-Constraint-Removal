@@ -8,7 +8,17 @@ matplotlib.use('TkAgg') #For pycharm to run matplotlib
 
 #Extension of the previous test environment
 #Uses RRT and find the min path with MCR with a removal cost
-#Has a cap of max cost to not breach in order to stay optimal
+#Has a cap of max cost to not breach for each removal
+#The MCR uses RRT and the constraint removal cost as its optimization criteria
+#Minimizes the sum of removal costs
+#This implementation is buggy
+#Each time a new node lies inside an obstacle it checks the cost of removal
+#If adding this exceeds the total allowed cost it skips
+#Otherwise the obstacle is removed
+
+#In the next test environment, there will be removable and non-removable constraints
+#The new sampling based MCR implementation will be tested there
+
 
 # =========================================================
 # 1. Generate Random Grid Map with Soft Constraints
@@ -71,7 +81,7 @@ def steer(from_node, to_node, step_size=2):
     return Node(new_x, new_y, from_node)
 
 # =========================================================
-# 3. MCR-RRT: Minimum Constraint Removal Extension
+# 3. MCR-RRT
 # =========================================================
 def mcr_rrt(grid, costs, start, goal, max_iter=2000, step_size=2, max_removal_cost=10.0):
     start_node = Node(*start)
@@ -92,12 +102,12 @@ def mcr_rrt(grid, costs, start, goal, max_iter=2000, step_size=2, max_removal_co
         new_removed = set(nearest.removed_constraints)
         new_cost = nearest.cost
 
-        # Handle obstacle encounter (potential constraint removal)
+        # Handle obstacle encounter potential removal
         if 0 <= y < grid.shape[0] and 0 <= x < grid.shape[1]:
             if grid[y][x] == 1:  # obstacle
                 removal_cost = costs[y][x]
                 if new_cost + removal_cost > max_removal_cost:
-                    continue  # skip, too expensive to remove
+                    continue  # too expensive so skip this
                 new_removed.add((x, y))
                 new_cost += removal_cost
 
@@ -130,7 +140,7 @@ def extract_path(goal_node):
     return path[::-1]
 
 # =========================================================
-# 4. Visualization
+# 4. Visualization of the Environment
 # =========================================================
 def visualize(grid, costs, nodes, path, start, goal, removed):
     plt.figure(figsize=(8, 8))

@@ -12,7 +12,6 @@ matplotlib.use('TkAgg')
 #Gives the min number of constr to remove from the shortest path
 
 
-
 def generate_random_grid(width, height, obstacle_density=0.2, seed=None):
 
     #Generates a random 2D grid map for path planning
@@ -41,7 +40,6 @@ def generate_random_grid(width, height, obstacle_density=0.2, seed=None):
 
     return grid, start, goal
 
-# 0 = free, 1 = obstacle
 grid, start, goal = generate_random_grid(20, 20, 0.25, None)
 
 def neighbors(pos, nrows, ncols):

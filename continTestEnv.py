@@ -35,7 +35,7 @@ def generate_random_grid(width, height, obstacle_density=0.2, seed=None):
     return grid, start, goal
 
 # =========================================================
-# 2. RRT Implementation
+# 2. RRT Implementation Without Collission
 # =========================================================
 class Node:
     def __init__(self, x, y, parent=None):
@@ -96,7 +96,7 @@ def extract_path(goal_node):
     return path[::-1]
 
 # =========================================================
-# 3. Visualization
+# 3. Visualization of the Test Environment
 # =========================================================
 def visualize(grid, nodes, path, start, goal):
     plt.figure(figsize=(8, 8))
