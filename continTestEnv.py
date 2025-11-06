@@ -122,7 +122,7 @@ def visualize(grid, nodes, path, start, goal):
 # 4. Run the test
 # =========================================================
 if __name__ == "__main__":
-    grid, start, goal = generate_random_grid(50, 50, obstacle_density=0.25, seed=42)
+    grid, start, goal = generate_random_grid(50, 50, obstacle_density=0.25)
     print("Start:", start, "Goal:", goal)
 
     nodes, goal_node = rrt_planner(grid, start, goal, max_iter=2000, step_size=2)
