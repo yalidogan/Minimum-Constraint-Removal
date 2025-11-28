@@ -6,49 +6,17 @@ import matplotlib.pyplot as plt
 import heapq
 import itertools
 import random
-from math import sqrt
+from math import sqrt, atan2, cos, sin
 
-#This is a proper test document for the MCR implementation
-#Here I have implemented a sampling based MCR implementation based on some articles
-#The algorithm using the minheap of the implementation before was a greedy approach
-#It could get stuck on local minima and was not that much of an improvement
-#Here the algorithm works as such:
+#The same as MCR-Sampling
+#But the smapling is improved by a greedy technique
+#Instead of taking one small step towards a random point and stopping
+#The new logic keeps going towards the random point until it
+# either reaches it or hits a hard obstacle
+#This allows us to shoot long branches into open spaces
+#In the previous sampling algorithm, when the point was far away, it was ignored essentially
+#Added shortcut techniques and changed the planner to use floats as well
 
-#First build a roadmap to the goal:
-#Uses RRT
-#pick a random point off the grid, or pick goal if its goal biased
-#find node closest in the tree to q_random
-#If q_random is the goal we try to connect all the way
-#o/w we steer one stepsize from q_n to q_rand to get a new q_rand
-#If it hits any hard collisions we discard this new point and start the loop again
-#Completely ignore soft obstacles for now!
-
-#This part happens in step 1 right before adding the new edge to the tree
-#Look at the valid edge we are about to create from q_n to q_new
-#Scan the edge and find the soft constraints
-#For every soft constr we update the master list
-#Add a remove option to its list of available disp
-#0 mean keep 1 mean remove
-
-#THEN: We find the optimal path with an A* solver:
-#We run an A* search on the RRT TREE not the whole graph
-#a*'s goal is to find the path from the start node to any goal that minimizes:
-#total length + total penalty
-#It removes any of the soft constr on top of the path
-
-#The A* search finds the path through the RRT tree
-#that has the cheapest combination of length and removal penalties
-
-#The come from dictionary allows reconstruction and see which constr are removed
-
-#This code is for the MCR problem and can be followed up by MCD as well.
-
-
-
-
-# ==============================
-# Generate the Test Environment
-# ==============================
 def generate_random_grid(size=30, obstacle_density=0.25, soft_ratio=0.4, seed=None):
     if seed is not None:
         random.seed(seed)
@@ -61,14 +29,9 @@ def generate_random_grid(size=30, obstacle_density=0.25, soft_ratio=0.4, seed=No
     return grid
 
 
-# ========================================
-# Bresenham Line
-# ========================================
 def bresenham_line(x1, y1, x2, y2):
-    #Generate grid cells on a line for collision check
     x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
     points = []
-    #Below coord code is very error prone
     dx, dy = abs(x2 - x1), abs(y2 - y1)
     sx = 1 if x1 < x2 else -1
     sy = 1 if y1 < y2 else -1
@@ -87,9 +50,6 @@ def bresenham_line(x1, y1, x2, y2):
     return points
 
 
-# ==============================
-# NODE class -> very simple
-# ==============================
 class Node:
     def __init__(self, pos, parent=None):
         self.pos = pos
@@ -97,36 +57,23 @@ class Node:
         self.children = []
 
     def __lt__(self, other):
-        #Allows for the comparison of nodes
         return id(self) < id(other)
 
 
-# ==============================
-# MCD SAMPLING PLANNER
-# ==============================
-
-#change the parameters here for different path length or removal strategies
-
 class MCDSamplingPlanner:
-    def __init__(self, grid, start, goal, step_size=3, max_iters=5000, penalty=500, goal_bias=0.1):
+    def __init__(self, grid, start, goal, step_size=1, max_iters=5000, penalty=500, goal_bias=0.1):
         self.grid = grid
         self.start_node = Node(start)
         self.goal_pos = goal
         self.step_size = step_size
         self.max_iters = max_iters
-        self.penalty = penalty  # cost to remove a constr
+        self.penalty = penalty
         self.goal_bias = goal_bias
-        self.w_L = 0.00001  # Weight for path length
+        self.w_L = 0.0001
 
-        self.nodes = [self.start_node]  # Set of all nodes in the roadmap
-
-        # Identify all soft obstacles
+        self.nodes = [self.start_node]
         self.soft_obstacles = set(zip(*np.where(grid == 2)))
-
-        # self.obstacles_D: { (x,y): [list_of_displacements] }
-        # 0 = keep obstacle (cost 0), 1 = remove obstacle (cost self.penalty)
         self.obstacles_D = {obs: [0] for obs in self.soft_obstacles}
-
         self.tie_breaker = itertools.count()
 
     def get_random_point(self):
@@ -136,64 +83,81 @@ class MCDSamplingPlanner:
                 random.randint(0, self.grid.shape[1] - 1))
 
     def nearest(self, point):
-        return min(self.nodes, key=lambda n: self.dist(n.pos, point))
-
-    def steer(self, from_pos, to_point):
-        x1, y1 = from_pos
-        x2, y2 = to_point
-        dx, dy = x2 - x1, y2 - y1
-        dist = self.dist(from_pos, to_point)
-        if dist == 0:
-            return from_pos
-        scale = min(self.step_size / dist, 1)
-        new_pos = (int(x1 + dx * scale), int(y1 + dy * scale))
-        return new_pos
+        return min(self.nodes, key=lambda n: (n.pos[0] - point[0]) ** 2 + (n.pos[1] - point[1]) ** 2)
 
     def dist(self, p1, p2):
         return sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
 
     def check_edge_hard_collision(self, from_pos, to_pos):
-        #To only check for hard constr collisions
         line = bresenham_line(*from_pos, *to_pos)
         for (x, y) in line:
             if x < 0 or y < 0 or x >= self.grid.shape[0] or y >= self.grid.shape[1]:
-                return True  # outside grid
-            if self.grid[x, y] == 1:  # hard constraint
+                return True
+            if self.grid[x, y] == 1:  # Hard obstacle
                 return True
         return False
 
-    def plan(self):
+    def _phase2_sample_displacement(self, from_pos, to_pos):
+        line = bresenham_line(*from_pos, *to_pos)
+        path_set = set(line)
+        colliding_soft_obs = path_set.intersection(self.soft_obstacles)
+        for obs in colliding_soft_obs:
+            if 1 not in self.obstacles_D[obs]:
+                self.obstacles_D[obs].append(1)
 
-        # build the roadmap and the sample displacement
+    def plan(self):
         print(f"Building roadmap ({self.max_iters} iterations)...")
+
         for i in range(self.max_iters):
             q_rand = self.get_random_point()
-            q_n = self.nearest(q_rand)
+            q_near = self.nearest(q_rand)
+            curr_node = q_near
 
-            # If goal-biased, try to connect all the way to the goal
-            if q_rand == self.goal_pos:
-                q_new_pos = self.goal_pos
-            else:
-                q_new_pos = self.steer(q_n.pos, q_rand)
+            # --- FIX: Track position as float to allow diagonal movement ---
+            curr_x, curr_y = float(curr_node.pos[0]), float(curr_node.pos[1])
 
-            if q_new_pos == q_n.pos:
-                continue
+            # Greedy extend loop
+            while self.dist(curr_node.pos, q_rand) > 0.5:
+                # Calculate direction
+                theta = atan2(q_rand[1] - curr_node.pos[1], q_rand[0] - curr_node.pos[0])
 
-            if not self.check_edge_hard_collision(q_n.pos, q_new_pos):
-                #Sample displacement
-                self._phase2_sample_displacement(q_n.pos, q_new_pos)
+                # Update float position
+                curr_x += self.step_size * cos(theta)
+                curr_y += self.step_size * sin(theta)
 
-                #Add the new node to a tree
-                new_node = Node(q_new_pos, parent=q_n)
-                q_n.children.append(new_node)
+                # Convert to int for grid checking (Round instead of floor)
+                q_new_pos = (int(round(curr_x)), int(round(curr_y)))
+
+                if q_new_pos == curr_node.pos:
+                    continue  # Moved less than a pixel, keep accumulating float
+
+                # Check Bounds
+                if not (0 <= q_new_pos[0] < self.grid.shape[0] and 0 <= q_new_pos[1] < self.grid.shape[1]):
+                    break
+
+                # 1. Check Hard Collisions
+                if self.check_edge_hard_collision(curr_node.pos, q_new_pos):
+                    break
+
+                    # 2. Add Node
+                new_node = Node(q_new_pos, parent=curr_node)
+                curr_node.children.append(new_node)
                 self.nodes.append(new_node)
 
-        print("Roadmap built. Running MCD solver...")
+                # 3. Sample Displacements
+                self._phase2_sample_displacement(curr_node.pos, q_new_pos)
 
-        #Run the discrete MCR solver
+                curr_node = new_node
+
+        print(f"Roadmap built with {len(self.nodes)} nodes. Running MCD solver...")
+
         path, displacements, cost = self.run_discrete_mcd_solver()
 
+        # --- FIX: Run Shortcut Optimizer ---
         if path:
+            print(f"Original path cost: {cost:.2f}. optimizing...")
+            path, displacements, cost = self.shortcut_path(path)
+
             path_length = 0
             for i in range(len(path) - 1):
                 path_length += self.dist(path[i], path[i + 1])
@@ -207,31 +171,25 @@ class MCDSamplingPlanner:
             }
         return None
 
-    def _phase2_sample_displacement(self, from_pos, to_pos):
-        #Finds a soft obst on the edge and sample a remove
-        line = bresenham_line(*from_pos, *to_pos)
-        colliding_soft_obs = {obs for obs in line if obs in self.soft_obstacles}
-
-        for obs in colliding_soft_obs:
-            if 1 not in self.obstacles_D[obs]:
-                self.obstacles_D[obs].append(1)  # 1 = "remove"
-
     def find_cheapest_edge_cost(self, from_pos, to_pos):
-        #Calculates the min cost to traverse an edge with curr sample displacement
         line = bresenham_line(*from_pos, *to_pos)
         path_length = self.dist(from_pos, to_pos)
         edge_disp_cost = 0
         edge_disps = {}
 
+        # Hard collision check
         for (x, y) in line:
             if self.grid[x, y] == 1:
                 return float('inf'), {}
 
-        colliding_soft_obs = {obs for obs in line if obs in self.soft_obstacles}
+        # Soft collision check
+        path_set = set(line)
+        colliding_soft_obs = path_set.intersection(self.soft_obstacles)
 
         for obs in colliding_soft_obs:
+            # We assume if we are shortcutting, we are allowed to remove anything
+            # that was DISCOVERED during the RRT phase.
             available_disps = self.obstacles_D[obs]
-
             if 1 in available_disps:
                 edge_disp_cost += self.penalty
                 edge_disps[obs] = 1
@@ -242,11 +200,8 @@ class MCDSamplingPlanner:
         return total_edge_cost, edge_disps
 
     def run_discrete_mcd_solver(self):
-        #Runs an A* search on the RRT roadmap to find the cheapest path from start to goal
-
         start_h = self.dist(self.start_node.pos, self.goal_pos) * self.w_L
         pq = [(start_h, 0, next(self.tie_breaker), self.start_node, None, {})]
-
         visited_costs = {}
         came_from = {}
 
@@ -255,59 +210,88 @@ class MCDSamplingPlanner:
 
             if node in visited_costs and visited_costs[node] <= J_cost:
                 continue
-
             visited_costs[node] = J_cost
             came_from[node] = (parent, edge_disps)
 
             if node.pos == self.goal_pos:
-                print(f"Solver found goal node with cost {J_cost}.")
+                print(f"Solver found goal node with cost {J_cost:.4f}.")
                 return self.reconstruct_mcd_path(came_from, node, J_cost)
 
             for child in node.children:
-                # I don't check visited_costs here.
-                # Let heap do that
-
                 edge_J_cost, edge_disps_to_child = self.find_cheapest_edge_cost(node.pos, child.pos)
-
-                if edge_J_cost == float('inf'):
-                    continue
+                if edge_J_cost == float('inf'): continue
 
                 new_J_cost = J_cost + edge_J_cost
-
-                # must check if this new path to the child is better
-                # than any other path already found to it.
-                if new_J_cost >= visited_costs.get(child, float('inf')):
-                    continue  # Not a better path dont add
+                if new_J_cost >= visited_costs.get(child, float('inf')): continue
 
                 h = self.dist(child.pos, self.goal_pos) * self.w_L
-                new_f_cost = new_J_cost + h
+                heapq.heappush(pq,
+                               (new_J_cost + h, new_J_cost, next(self.tie_breaker), child, node, edge_disps_to_child))
 
-                heapq.heappush(pq, (new_f_cost, new_J_cost, next(self.tie_breaker), child, node, edge_disps_to_child))
-
-        print("Solver could not find a path to any goal node.")
         return None, {}, float('inf')
 
     def reconstruct_mcd_path(self, came_from, goal_node, cost):
         path = []
         all_disps = {}
         curr_node = goal_node
-
         while curr_node is not None:
             path.append(curr_node.pos)
             parent_node, edge_disps = came_from[curr_node]
             all_disps.update(edge_disps)
             curr_node = parent_node
-
         path.reverse()
         final_disps = {obs: disp for obs, disp in all_disps.items() if disp == 1}
         return path, final_disps, cost
 
+    # --- NEW FUNCTION: SHORTCUTTING ---
+    def shortcut_path(self, path, iterations=150):
+        """Attempts to skip waypoints to reduce cost (removals + length)."""
+        if len(path) < 3:
+            return path, {}, 0  # Can't shortcut
 
-# ==============================
-# RUN TEST
-# ==============================
+        # Re-calculate initial cost/disps
+        current_path = list(path)
+
+        for _ in range(iterations):
+            if len(current_path) < 3: break
+
+            # Pick two random indices
+            idx_a = random.randint(0, len(current_path) - 2)
+            idx_b = random.randint(idx_a + 1, len(current_path) - 1)
+
+            pos_a = current_path[idx_a]
+            pos_b = current_path[idx_b]
+
+            # Check direct connection cost
+            shortcut_cost, shortcut_disps = self.find_cheapest_edge_cost(pos_a, pos_b)
+
+            if shortcut_cost == float('inf'):
+                continue
+
+            # Calculate cost of the EXISTING segment between A and B
+            existing_cost = 0
+            for i in range(idx_a, idx_b):
+                c, _ = self.find_cheapest_edge_cost(current_path[i], current_path[i + 1])
+                existing_cost += c
+
+            # If shortcut is cheaper, replace the segment
+            if shortcut_cost < existing_cost:
+                # Replace the middle part with nothing (direct connection)
+                current_path = current_path[:idx_a + 1] + current_path[idx_b:]
+
+        # Recalculate final stats for the shortcut path
+        final_cost = 0
+        final_disps = {}
+        for i in range(len(current_path) - 1):
+            c, d = self.find_cheapest_edge_cost(current_path[i], current_path[i + 1])
+            final_cost += c
+            final_disps.update(d)
+
+        return current_path, final_disps, final_cost
+
 
 if __name__ == "__main__":
+    # Use the same seed to verify the fix
     grid = generate_random_grid(size=20, obstacle_density=0.25, soft_ratio=0.4, seed=115)
     start = (0, 0)
     goal = (18, 19)
@@ -315,31 +299,30 @@ if __name__ == "__main__":
     planner = MCDSamplingPlanner(grid, start, goal,
                                  step_size=1,
                                  max_iters=5000,
-                                 penalty=50000000,
-                                 goal_bias=0.05)
+                                 penalty=50000,
+                                 goal_bias=0.10)
 
     result = planner.plan()
 
     plt.figure(figsize=(8, 8))
     plt.imshow(grid.T, origin="lower", cmap="gray_r")
+    plt.scatter(*start, c='green', s=100, label="Start")
+    plt.scatter(*goal, c='blue', s=100, label="Goal")
 
-    plt.scatter(*start, c='green', s=80, label="Start")
-    plt.scatter(*goal, c='blue', s=80, label="Goal")
+    for node in planner.nodes:
+        if node.parent:
+         p1, p2 = node.parent.pos, node.pos
+         plt.plot([p1[0], p2[0]], [p1[1], p2[1]], 'g-', alpha=0.1)
 
     if result:
         path = result["path"]
         xs, ys = zip(*path)
         plt.plot(xs, ys, 'r-', linewidth=2, label="Path")
-
         if result["removed_constraints"]:
             r_xs, r_T = zip(*result["removed_constraints"])
-            plt.scatter(r_xs, r_T, c='orange', s=50, marker='x', label="Removed Constraints")
-        else:
-            plt.scatter([], [], c='orange', s=50, marker='x', label="Removed Constraints")
-
+            plt.scatter(r_xs, r_T, c='orange', s=60, marker='x', label="Removed")
         print("\n Path found!")
         print(f"  Total Cost: {result['total_cost']:.2f}")
-        print(f"  Path Length: {result['path_length']:.2f}")
         print(f"  Soft Constraints Removed: {result['soft_violations']}")
     else:
         print("\n No path found")
