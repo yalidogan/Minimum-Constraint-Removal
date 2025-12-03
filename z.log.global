@@ -1,0 +1,19 @@
+** compiled at:     Nov 26 2024 16:46:14
+** execution start: 2025-12-03 18:39:33:10997
+graph.cpp:initParameters:1512(3) opening config file 'rai.cfg'
+graph.cpp:initParameters:1519(3)  - failed
+graph.cpp:initParameters:1525(3) opening base config file '/root/local/rai/../local.cfg'
+graph.cpp:initParameters:1531(3)  - failed
+util.cpp:cd_start:1034(3) entering path '/home/yali/Desktop/MCR'
+util.cpp:cd_file:1042(3) entering path 'config/slot' from '/home/yali/Desktop/MCR'
+util.cpp:getIs:1071(3) opening input file 'slot.g'
+util.cpp:cd_start:1034(3) entering path '/home/yali/Desktop/MCR/config/slot'
+util.cpp:cd_file:1042(3) entering path '..' from '/home/yali/Desktop/MCR/config/slot'
+util.cpp:getIs:1071(3) opening input file 'base-walls-min.g'
+util.cpp:cd_start:1034(3) entering path '/home/yali/Desktop/MCR/config/slot'
+util.cpp:cd_start:1034(3) entering path '/home/yali/Desktop/MCR'
+** execution stop: 2025-12-03 18:39:46:762832
+** real time: 13.7519sec
+** CPU time: 12.0408
+
+** set+queried params:

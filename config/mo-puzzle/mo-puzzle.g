@@ -1,0 +1,51 @@
+Include: <../base-walls-min.g>
+##############################################################################################################################
+egoJoint(world){ Q:[0.0 0.0 0.1] } # works
+ego(egoJoint) {
+    Q:[1.2, 1.2, 0], shape:ssCylinder, size:[.2 .18 .02], color:[0.96875 0.7421875 0.30859375], logical:{agent}, limits: [-4 4 -4 4], sampleUniform:1,
+    joint:transXY, contact: 1
+}
+##############################################################################################################################
+
+wall1 (world){ shape:ssBox, Q:[1 1.8 0.1], size:[.1 .4 0.2 .02] , color:[0.6953 0.515625 .453125], contact: 1, logical: {static} }
+wall2 (world){ shape:ssBox, Q:[1.8 1 0.1], size:[.4 .1 0.2 .02] , color:[0.6953 0.515625 .453125], contact: 1, logical: {static} }
+
+wall3 (world){ shape:ssBox, Q:[.25 -.25 0.1 0.9305076 0 0 0.3662725], size:[2 .1 0.2 .02] , color:[0.6953 0.515625 .453125], contact: 1, logical: {static} }
+wall4 (world){ shape:ssBox, Q:[-.25 .25 0.1 0.9305076 0 0 0.3662725], size:[2 .1 0.2 .02] , color:[0.6953 0.515625 .453125], contact: 1, logical: {static} }
+
+wall5 (world){ shape:ssBox, Q:[1 -1.8 0.1], size:[.1 .4 0.2 .02] , color:[0.6953 0.515625 .453125], contact: 1, logical: {static} }
+wall6 (world){ shape:ssBox, Q:[1.8 -1 0.1], size:[.4 .1 0.2 .02] , color:[0.6953 0.515625 .453125], contact: 1, logical: {static} }
+
+wall7 (world){ shape:ssBox, Q:[-1 -1.8 0.1], size:[.1 .4 0.2 .02] , color:[0.6953 0.515625 .453125], contact: 1, logical: {static} }
+wall8 (world){ shape:ssBox, Q:[-1.8 -1 0.1], size:[.4 .1 0.2 .02] , color:[0.6953 0.515625 .453125], contact: 1, logical: {static} }
+
+wall9 (world){ shape:ssBox, Q:[-1 1.8 0.1], size:[.1 .4 0.2 .02] , color:[0.6953 0.515625 .453125], contact: 1, logical: {static} }
+wall10(world){ shape:ssBox, Q:[-1.8 1 0.1], size:[.4 .1 0.2 .02] , color:[0.6953 0.515625 .453125], contact: 1, logical: {static} }
+##############################################################################################################################
+goal1 (floor){ shape:ssBox, Q:"t(1.6 -1.6 .1)",  size:[.25 .25 .2 .02], color:[1 0 0 .3], contact:0, joint:rigid, logical: {goal} }
+goal2 (floor){ shape:ssBox, Q:"t(-1.5 -1.5 .1)", size:[.25 .25 .2 .02], color:[0 1 0 .3], contact:0, joint:rigid, logical: {goal} }
+goal3 (floor){ shape:ssBox, Q:"t(-.3 -.3 .1)", size:[.25 .25 .2 .02], color:[0 0 1 .3], contact:0, joint:rigid, logical: {goal} }
+goal4 (floor){ shape:ssBox, Q:"t(-1 1 .1)", size:[.4 .4 .2 .02], color:[.5 .8 .5 .3], contact:0, joint:rigid, logical: {goal} }
+goal5 (floor){ shape:ssBox, Q:"t(.5 -1 .1)", size:[.4 .4 .2 .02], color:[.5 .5 .8 .3], contact:0, joint:rigid, logical: {goal} }
+
+##############################################################################################################################
+obj1Joint(world){ Q:[1.6 1.6 0.1] }
+obj1(obj1Joint) { type:ssBox size:[.25 .25 .2 .02] color:[1. 0. 0.],  logical={ movable_go }, joint:rigid, contact: 1 }
+
+obj2Joint(world){ Q:[.8 .8 0.1] }
+obj2(obj2Joint) { type:ssBox size:[.25 .25 .2 .02] color:[0. 1. 0],  logical={ movable_go }, joint:rigid, contact: 1 }
+
+obj3Joint(world){ Q:[-1.6 1.6 0.1] }
+obj3(obj3Joint) { type:ssBox size:[.25 .25 .2 .02] color:[0. 0. 1],  logical={ movable_go }, joint:rigid, contact: 1 }
+
+obj4Joint(world){ Q:[.6 1.4 0.1] }
+obj4(obj4Joint) { type:ssBox size:[.4 .4 .2 .02] color:[.5 .8 .5],  logical={ movable_go }, joint:rigid, contact: 1 }
+
+obj5Joint(world){ Q:[1.4 .6 0.1] }
+obj5(obj5Joint) { type:ssBox size:[.4 .4 .2 .02] color:[.5 .5 .8],  logical={ movable_go }, joint:rigid, contact: 1 }
+##############################################################################################################################
+obs1Joint(world){ Q:[-1.4 -.6 0.1] }
+obs1(obs1Joint) { type:ssBox size:[.4 .4 .2 .02] color:[1 1 1],  logical={ movable_o }, joint:rigid, contact: 1 }
+
+obs2Joint(world){ Q:[-.6 -1.4 0.1] }
+obs2(obs2Joint) { type:ssBox size:[.4 .4 .2 .02] color:[1 1 1],  logical={ movable_o }, joint:rigid, contact: 1 }
