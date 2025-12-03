@@ -294,7 +294,7 @@ if __name__ == "__main__":
 
         if result:
                 print("\n" + "="*40)
-                print(f"SUCCESS: Path Found")
+                print(f"Path Found")
                 print(f"Objects that must be removed: {result['num_removals']}")
                 print(f"List of Objects: {result['removed_constraints']}")
                 print("="*40)
